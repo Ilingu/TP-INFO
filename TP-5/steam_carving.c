@@ -276,15 +276,71 @@ void reduce_column(image *im, unsigned n)
     energy_delete(e);
 }
 
-// void energy_min_path(energy *e);
+void energy_min_path(energy *e)
+{
+    for (unsigned i = 1; i < e->h; i++)
+        for (unsigned j = 0; j < e->w; j++)
+        {
+            double upleft = j == 0 ? 0.0 : e->at[i - 1][j - 1], upmid = e->at[i - 1][j], upright = j == e->w - 1 ? 0.0 : e->at[i - 1][j + 1];
+            double min_neighbor = j == 0 ? (upmid < upright ? upmid : upright) : j == e->w - 1 ? (upleft < upmid ? upleft : upmid)
+                                                                                               : (upleft < upmid && upmid < upright ? upleft : upmid < upright ? upmid
+                                                                                                                                                               : upright);
+            e->at[i][j] += min_neighbor;
+        }
+}
 
-// path *path_new(int n);
+typedef struct path
+{
+    unsigned *at;
+    unsigned size;
+} path;
 
-// void path_delete(path *p);
+path *path_new(unsigned h)
+{
+    path *p = malloc(1 * sizeof(path));
+    p->at = malloc(h * sizeof(unsigned));
+    p->size = h;
+    return p;
+}
+
+void path_delete(path *p)
+{
+    free(p->at);
+    free(p);
+}
 
 // void compute_min_path(energy *e, path *p);
 
 // void reduce_seam_carving(image *im, int n);
+
+void test()
+{
+    energy *e = energy_new(3, 3);
+    {
+        e->at[0][0] = 15;
+        e->at[0][1] = 10;
+        e->at[0][2] = 0;
+    }
+    {
+        e->at[1][0] = 1;
+        e->at[1][1] = 2;
+        e->at[1][2] = 3;
+    }
+    {
+        e->at[2][0] = 0;
+        e->at[2][1] = 0;
+        e->at[2][2] = 0;
+    }
+    energy_min_path(e);
+    for (unsigned i = 0; i < 3; i++)
+    {
+        for (unsigned j = 0; j < 3; j++)
+            printf("%f ", e->at[i][j]);
+        printf("\n");
+    }
+
+    energy_delete(e);
+}
 
 int main(int argc, char *argv[])
 {
@@ -298,10 +354,16 @@ int main(int argc, char *argv[])
 
     image *im = image_load(f_in);
 
-    reduce_column(im, 100);
+    energy *e = energy_new(im->h, im->w);
+    compute_energy(im, e);
+    energy_min_path(e);
 
-    image_save(im, f_out); // save changes
+    image *ime = energy_to_image(e);
+    image_save(ime, f_out); // save changes
+
     image_delete(im);
+    image_delete(ime);
+    energy_delete(e);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
