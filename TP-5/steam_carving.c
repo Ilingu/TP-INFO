@@ -215,9 +215,6 @@ void reduce_pixels(image *im, unsigned n)
     energy *e = energy_new(im->h, im->w);
     compute_energy(im, e);
 
-    assert(e->h == im->h);
-    assert(e->w == im->w);
-
     for (unsigned j = 0; j < n; j++)
         reduce_one_pixel(im, e);
 
@@ -309,36 +306,87 @@ void path_delete(path *p)
     free(p);
 }
 
-// void compute_min_path(energy *e, path *p);
+void compute_min_path(energy *e, path *p)
+{
+    unsigned min_last_col_index = 0;
+    for (unsigned j = 0; j < e->w; j++)
+        if (e->at[e->h - 1][j] < e->at[e->h - 1][min_last_col_index])
+            min_last_col_index = j;
+    p->at[e->h - 1] = min_last_col_index;
 
-// void reduce_seam_carving(image *im, int n);
+    for (int i = e->h - 1; i >= 0; i--)
+    {
+        double upleft = min_last_col_index == 0 ? 0.0 : e->at[i][min_last_col_index - 1], upmid = e->at[i][min_last_col_index], upright = min_last_col_index == e->w - 1 ? 0.0 : e->at[i][min_last_col_index + 1];
+        unsigned min_neighbor_index = min_last_col_index == 0 ? (upmid < upright ? min_last_col_index : min_last_col_index + 1) : min_last_col_index == e->w - 1 ? (upleft < upmid ? min_last_col_index - 1 : min_last_col_index)
+                                                                                                                                                                 : (upleft < upmid && upmid < upright ? min_last_col_index - 1 : upmid < upright ? min_last_col_index
+                                                                                                                                                                                                                                                 : min_last_col_index + 1);
+        p->at[i] = min_neighbor_index;
+        min_last_col_index = min_neighbor_index;
+    }
+}
+
+void reduce_seam_carving(image *im, unsigned n)
+{
+    energy *e = energy_new(im->h, im->w);
+    path *p = path_new(im->h);
+
+    for (unsigned i = 0; i < n; i++)
+    {
+        compute_energy(im, e);
+        energy_min_path(e);
+        compute_min_path(e, p);
+
+        for (unsigned i = 0; i < im->h; i++)
+        {
+            unsigned col = p->at[i];
+            for (unsigned j = col; j < im->w - 1; j++)
+                im->at[i][j] = im->at[i][j + 1];
+        }
+
+        e->w--;
+        im->w--;
+    }
+
+    path_delete(p);
+    energy_delete(e);
+}
 
 void test()
 {
-    energy *e = energy_new(3, 3);
+    energy *e = energy_new(3, 4);
     {
-        e->at[0][0] = 15;
-        e->at[0][1] = 10;
-        e->at[0][2] = 0;
+        e->at[0][0] = 2;
+        e->at[0][1] = 1;
+        e->at[0][2] = 1;
+        e->at[0][3] = 0;
     }
     {
-        e->at[1][0] = 1;
-        e->at[1][1] = 2;
-        e->at[1][2] = 3;
+        e->at[1][0] = 3;
+        e->at[1][1] = 3;
+        e->at[1][2] = 2;
+        e->at[1][3] = 2;
     }
     {
-        e->at[2][0] = 0;
+        e->at[2][0] = 2;
         e->at[2][1] = 0;
-        e->at[2][2] = 0;
+        e->at[2][2] = 1;
+        e->at[2][3] = 2;
     }
     energy_min_path(e);
     for (unsigned i = 0; i < 3; i++)
     {
-        for (unsigned j = 0; j < 3; j++)
+        for (unsigned j = 0; j < 4; j++)
             printf("%f ", e->at[i][j]);
         printf("\n");
     }
+    printf("------------\n");
 
+    path *p = path_new(3);
+    compute_min_path(e, p);
+    for (unsigned i = 0; i < 3; i++)
+        printf("%d\n", p->at[i]);
+
+    path_delete(p);
     energy_delete(e);
 }
 
@@ -354,16 +402,9 @@ int main(int argc, char *argv[])
 
     image *im = image_load(f_in);
 
-    energy *e = energy_new(im->h, im->w);
-    compute_energy(im, e);
-    energy_min_path(e);
-
-    image *ime = energy_to_image(e);
-    image_save(ime, f_out); // save changes
+    reduce_seam_carving(im, 500);
+    image_save(im, f_out); // save changes
 
     image_delete(im);
-    image_delete(ime);
-    energy_delete(e);
-
     return EXIT_SUCCESS;
 }
