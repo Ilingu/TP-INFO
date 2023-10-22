@@ -105,7 +105,7 @@ ui *malloc_ui64(ui size)
 
   if (heap[0] == 2)
   {
-    if (2 + 1 + size + 1 + 2 >= HEAP_SIZE)
+    if (1 + 2 + 1 + size + 1 + 2 >= HEAP_SIZE)
       return NULL;
 
     set_used(3, size);
